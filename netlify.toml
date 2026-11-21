@@ -1,0 +1,10 @@
+# Sito statico: nessun build, si pubblica la cartella principale così com'è.
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"

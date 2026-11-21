@@ -38,7 +38,10 @@ l'attività viene salvata nel database.
 
 ## Metterla online
 
-Il modo più semplice è **GitHub Pages**: nel repository vai in
+L'app è pubblicata con **Netlify**, collegato a questo repository: ogni push
+sul ramo `main` aggiorna il sito in automatico (configurazione in `netlify.toml`).
+
+In alternativa si può usare **GitHub Pages**: nel repository vai in
 **Settings → Pages**, scegli *Deploy from a branch*, ramo `main`, cartella `/ (root)`.
 Dopo un minuto l'app è su `https://<organizzazione>.github.io/Planner-App/`.
 Condividi quel link con il team.
