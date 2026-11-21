@@ -1,0 +1,160 @@
+:root {
+  --bg: #ffffff;
+  --surface: #f7f7f5;
+  --card: #ffffff;
+  --text: #37352f;
+  --muted: #787774;
+  --border: #e9e9e7;
+  --hover: #efefed;
+  --accent: #2383e2;
+  --danger: #d44c47;
+  --todo: #9b9a97;
+  --doing: #2383e2;
+  --done: #4dab9a;
+  --shadow: 0 1px 2px rgba(15, 15, 15, 0.08);
+  --panel-shadow: -8px 0 24px rgba(15, 15, 15, 0.12);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #191919;
+    --surface: #202020;
+    --card: #2b2b2b;
+    --text: #e6e6e4;
+    --muted: #9b9b98;
+    --border: #353535;
+    --hover: #333333;
+    --accent: #529cca;
+    --danger: #e5726d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --panel-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Barra in alto */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand h1 { font-size: 16px; font-weight: 600; margin: 0; white-space: nowrap; }
+.logo { font-size: 18px; color: var(--muted); }
+.badge {
+  font-size: 12px; padding: 2px 8px; border-radius: 999px;
+  background: var(--surface); color: var(--muted); border: 1px solid var(--border); white-space: nowrap;
+}
+.badge.live { color: var(--done); border-color: currentColor; }
+.badge.live::before { content: "● "; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.people { display: flex; }
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 600; color: #fff; border: 2px solid var(--bg); margin-left: -6px;
+}
+.me-btn {
+  border: 1px solid var(--border); background: var(--card); border-radius: 6px; padding: 4px 10px;
+}
+.me-btn:hover { background: var(--hover); }
+
+/* Bacheca */
+.board {
+  flex: 1; display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 16px;
+  padding: 20px 24px; overflow-x: auto; align-items: start;
+}
+.column { background: var(--surface); border-radius: 10px; padding: 10px; min-height: 120px; }
+.column.drop { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.column-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; }
+.column-head h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.count { color: var(--muted); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-todo { background: var(--todo); }
+.dot-doing { background: var(--doing); }
+.dot-done { background: var(--done); }
+.cards { display: flex; flex-direction: column; gap: 8px; min-height: 8px; }
+
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  box-shadow: var(--shadow); cursor: pointer; text-align: left; width: 100%; position: relative;
+}
+.card:hover { background: var(--hover); }
+.card.dragging { opacity: 0.4; }
+.card.active { border-color: var(--accent); }
+.card-title { font-weight: 500; word-break: break-word; }
+.card-title.empty { color: var(--muted); }
+.card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.chip { background: var(--surface); border-radius: 4px; padding: 1px 6px; }
+.chip.late { color: var(--danger); }
+.card-typing {
+  position: absolute; top: -8px; right: 8px; font-size: 11px; color: #fff;
+  padding: 0 6px; border-radius: 4px;
+}
+
+.add {
+  width: 100%; margin-top: 8px; padding: 6px 8px; text-align: left;
+  background: none; border: 0; border-radius: 6px; color: var(--muted);
+}
+.add:hover { background: var(--hover); color: var(--text); }
+
+/* Pannello dettagli */
+.panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100%);
+  background: var(--bg); border-left: 1px solid var(--border); box-shadow: var(--panel-shadow);
+  padding: 16px 32px 32px; overflow-y: auto; display: flex; flex-direction: column;
+}
+.panel[hidden] { display: none; }
+.panel-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.saved { flex: 1; color: var(--muted); font-size: 12px; }
+.icon-btn, .danger-btn { background: none; border: 0; border-radius: 6px; padding: 4px 8px; color: var(--muted); }
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.danger-btn:hover { background: var(--hover); color: var(--danger); }
+
+.title-input {
+  font-size: 28px; font-weight: 700; border: 0; background: none; padding: 0; width: 100%; outline: none;
+}
+.typing { min-height: 18px; font-size: 12px; margin: 2px 0 8px; }
+.props { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 8px 0 20px; align-items: center; }
+.props dt { color: var(--muted); }
+.props dd { margin: 0; }
+.props input, .props select {
+  width: 100%; border: 1px solid transparent; background: none; border-radius: 4px; padding: 4px 6px;
+}
+.props input:hover, .props select:hover { background: var(--hover); }
+.props input:focus, .props select:focus { border-color: var(--border); background: var(--card); outline: none; }
+.notes {
+  flex: 1; min-height: 240px; border: 0; border-top: 1px solid var(--border); padding: 16px 0 0;
+  background: none; resize: none; outline: none; line-height: 1.6;
+}
+
+/* Finestra nome */
+dialog {
+  border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: min(360px, calc(100% - 32px));
+  background: var(--bg); color: var(--text);
+}
+dialog::backdrop { background: rgba(15, 15, 15, 0.45); }
+dialog h2 { margin: 0 0 4px; font-size: 18px; }
+dialog p { margin: 0 0 16px; color: var(--muted); }
+dialog input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); }
+dialog button {
+  margin-top: 12px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .topbar { padding: 10px 16px; }
+  .board { grid-template-columns: 1fr; padding: 16px; }
+  .panel { padding: 12px 16px 24px; }
+  .props { grid-template-columns: 100px 1fr; }
+}

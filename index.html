@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planner App</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">▦</span>
+      <h1>Planner App</h1>
+      <span id="mode" class="badge"></span>
+    </div>
+    <div class="topbar-right">
+      <div id="people" class="people" aria-label="Persone online"></div>
+      <button id="me" class="me-btn" type="button" title="Cambia nome"></button>
+    </div>
+  </header>
+
+  <main class="board" id="board">
+    <section class="column" data-status="todo">
+      <header class="column-head"><span class="dot dot-todo"></span><h2>Da fare</h2><span class="count"></span></header>
+      <div class="cards"></div>
+      <button class="add" type="button">+ Nuova attività</button>
+    </section>
+    <section class="column" data-status="doing">
+      <header class="column-head"><span class="dot dot-doing"></span><h2>In corso</h2><span class="count"></span></header>
+      <div class="cards"></div>
+      <button class="add" type="button">+ Nuova attività</button>
+    </section>
+    <section class="column" data-status="done">
+      <header class="column-head"><span class="dot dot-done"></span><h2>Fatto</h2><span class="count"></span></header>
+      <div class="cards"></div>
+      <button class="add" type="button">+ Nuova attività</button>
+    </section>
+  </main>
+
+  <aside id="panel" class="panel" hidden aria-label="Dettagli attività">
+    <div class="panel-bar">
+      <button id="close" class="icon-btn" type="button" aria-label="Chiudi">✕</button>
+      <span id="saved" class="saved"></span>
+      <button id="delete" class="danger-btn" type="button">Elimina</button>
+    </div>
+    <input id="f-title" class="title-input" placeholder="Senza titolo" autocomplete="off" />
+    <div id="typing-title" class="typing"></div>
+    <dl class="props">
+      <dt>Stato</dt>
+      <dd>
+        <select id="f-status">
+          <option value="todo">Da fare</option>
+          <option value="doing">In corso</option>
+          <option value="done">Fatto</option>
+        </select>
+      </dd>
+      <dt>Assegnato a</dt>
+      <dd><input id="f-assignee" placeholder="Nessuno" autocomplete="off" list="team-names" /></dd>
+      <dt>Scadenza</dt>
+      <dd><input id="f-due" type="date" /></dd>
+    </dl>
+    <textarea id="f-notes" class="notes" placeholder="Scrivi note, checklist, link…"></textarea>
+    <div id="typing-notes" class="typing"></div>
+    <datalist id="team-names"></datalist>
+  </aside>
+
+  <dialog id="name-dialog">
+    <form method="dialog">
+      <h2>Come ti chiami?</h2>
+      <p>Il tuo nome appare ai colleghi mentre scrivi.</p>
+      <input id="name-input" required maxlength="30" autocomplete="name" />
+      <button type="submit">Entra</button>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="store.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
