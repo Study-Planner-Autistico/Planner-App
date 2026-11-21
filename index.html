@@ -10,77 +10,154 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-row">
-      <div class="brand">
+  <div class="app">
+    <!-- ============ Barra laterale ============ -->
+    <aside class="sidebar" id="sidebar" aria-label="Navigazione">
+      <div class="ws">
         <div class="ws-icon" aria-hidden="true">SP</div>
-        <div>
-          <h1>Study Planner <span id="mode" class="badge"></span></h1>
-          <p class="sub">Attività del team</p>
+        <div class="ws-text">
+          <strong>Study Planner</strong>
+          <span id="mode" class="badge"></span>
         </div>
       </div>
-      <div class="topbar-right">
-        <div id="people" class="people" aria-label="Persone online"></div>
+
+      <nav class="nav">
+        <a class="nav-item" href="#/attivita" data-route="tasks">
+          <svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>
+          <span class="nav-label">Attività</span>
+          <span class="nav-count" id="nav-count"></span>
+        </a>
+      </nav>
+
+      <div class="nav-section">
+        <span>Pagine</span>
+        <button id="new-page" class="mini-btn" type="button" aria-label="Nuova pagina" title="Nuova pagina">+</button>
+      </div>
+      <nav id="page-list" class="nav page-list" aria-label="Pagine"></nav>
+      <button id="new-page-2" class="nav-item nav-add" type="button">
+        <span class="nav-icon" aria-hidden="true">+</span><span class="nav-label">Nuova pagina</span>
+      </button>
+
+      <div class="sidebar-foot">
         <button id="me" class="me-btn" type="button" title="Cambia nome"></button>
       </div>
+    </aside>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <!-- ============ Contenuto ============ -->
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-row">
+          <button id="menu" class="icon-btn menu-btn" type="button" aria-label="Apri menu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <div class="crumbs">
+            <h1 id="view-title"></h1>
+            <p id="view-sub" class="sub"></p>
+          </div>
+          <div id="people" class="people" aria-label="Persone online"></div>
+        </div>
+        <nav class="tabs" id="task-tabs" aria-label="Filtro attività">
+          <button class="tab active" type="button" data-filter="all">Tutte <span class="tab-count" id="count-all"></span></button>
+          <button class="tab" type="button" data-filter="mine">Assegnate a me <span class="tab-count" id="count-mine"></span></button>
+        </nav>
+      </header>
+
+      <!-- Vista: Attività -->
+      <main id="view-tasks" class="board">
+        <section class="column" data-status="todo">
+          <header class="column-head">
+            <span class="dot dot-todo"></span><h2>Da fare</h2><span class="count"></span>
+            <button class="add" type="button" aria-label="Nuova attività in Da fare">+</button>
+          </header>
+          <div class="cards"></div>
+        </section>
+        <section class="column" data-status="doing">
+          <header class="column-head">
+            <span class="dot dot-doing"></span><h2>In corso</h2><span class="count"></span>
+            <button class="add" type="button" aria-label="Nuova attività in In corso">+</button>
+          </header>
+          <div class="cards"></div>
+        </section>
+        <section class="column" data-status="done">
+          <header class="column-head">
+            <span class="dot dot-done"></span><h2>Completate</h2><span class="count"></span>
+            <button class="add" type="button" aria-label="Nuova attività in Completate">+</button>
+          </header>
+          <div class="cards"></div>
+        </section>
+      </main>
+
+      <!-- Vista: Pagina -->
+      <main id="view-page" class="doc-wrap" hidden>
+        <article class="doc">
+          <div class="doc-icon-row">
+            <button id="page-icon" class="doc-icon" type="button" aria-label="Cambia icona" title="Cambia icona">📄</button>
+            <div id="icon-picker" class="icon-picker" hidden></div>
+          </div>
+          <input id="page-title" class="doc-title" placeholder="Senza titolo" autocomplete="off" aria-label="Titolo della pagina" />
+          <div id="typing-page-title" class="typing"></div>
+          <textarea id="page-content" class="doc-content" placeholder="Inizia a scrivere…" aria-label="Testo della pagina"></textarea>
+          <div id="typing-page-content" class="typing"></div>
+
+          <section class="attachments" aria-labelledby="att-title">
+            <h3 id="att-title" class="section-title">Allegati <span id="file-count" class="muted"></span></h3>
+            <ul id="file-list" class="file-list"></ul>
+            <label class="dropzone" id="dropzone">
+              <input type="file" id="file-input" multiple />
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5l-8.2 8.2a5 5 0 01-7.1-7.1l8.6-8.6a3.4 3.4 0 014.8 4.8l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/></svg>
+              <span><strong>Trascina qui i file</strong> o clicca per sceglierli</span>
+              <small id="upload-limit"></small>
+            </label>
+            <p id="upload-status" class="upload-status" role="status"></p>
+          </section>
+
+          <div class="doc-foot">
+            <span id="page-saved" class="saved"></span>
+            <button id="delete-page" class="danger-btn" type="button">Elimina pagina</button>
+          </div>
+        </article>
+      </main>
+
+      <!-- Vista: nessuna pagina trovata -->
+      <main id="view-missing" class="doc-wrap" hidden>
+        <div class="doc empty-doc">
+          <h2>Questa pagina non esiste più</h2>
+          <p>Forse è stata eliminata da un collega.</p>
+          <a href="#/attivita">Torna alle attività</a>
+        </div>
+      </main>
     </div>
-    <nav class="tabs" aria-label="Filtro attività">
-      <button class="tab active" type="button" data-filter="all">Tutte <span class="tab-count" id="count-all"></span></button>
-      <button class="tab" type="button" data-filter="mine">Assegnate a me <span class="tab-count" id="count-mine"></span></button>
-    </nav>
-  </header>
+  </div>
 
-  <main class="board" id="board">
-    <section class="column" data-status="todo">
-      <header class="column-head">
-        <span class="dot dot-todo"></span><h2>Da fare</h2><span class="count"></span>
-        <button class="add" type="button" aria-label="Nuova attività in Da fare">+</button>
-      </header>
-      <div class="cards"></div>
-    </section>
-    <section class="column" data-status="doing">
-      <header class="column-head">
-        <span class="dot dot-doing"></span><h2>In corso</h2><span class="count"></span>
-        <button class="add" type="button" aria-label="Nuova attività in In corso">+</button>
-      </header>
-      <div class="cards"></div>
-    </section>
-    <section class="column" data-status="done">
-      <header class="column-head">
-        <span class="dot dot-done"></span><h2>Completate</h2><span class="count"></span>
-        <button class="add" type="button" aria-label="Nuova attività in Completate">+</button>
-      </header>
-      <div class="cards"></div>
-    </section>
-  </main>
-
+  <!-- Pannello dettagli attività -->
   <aside id="panel" class="panel" hidden aria-label="Dettagli attività">
     <div class="panel-bar">
       <button id="close" class="icon-btn" type="button" aria-label="Chiudi">✕</button>
       <span id="saved" class="saved"></span>
       <button id="delete" class="danger-btn" type="button">Elimina</button>
     </div>
-    <input id="f-title" class="title-input" placeholder="Senza titolo" autocomplete="off" />
+    <input id="f-title" class="title-input" placeholder="Senza titolo" autocomplete="off" aria-label="Titolo" />
     <div id="typing-title" class="typing"></div>
     <dl class="props">
       <dt>Stato</dt>
       <dd>
-        <select id="f-status">
+        <select id="f-status" aria-label="Stato">
           <option value="todo">Da fare</option>
           <option value="doing">In corso</option>
           <option value="done">Completata</option>
         </select>
       </dd>
       <dt>Etichetta</dt>
-      <dd><input id="f-tag" placeholder="Es. Studio, Esame…" autocomplete="off" list="tag-names" maxlength="24" /></dd>
+      <dd><input id="f-tag" placeholder="Es. Studio, Esame…" autocomplete="off" list="tag-names" maxlength="24" aria-label="Etichetta" /></dd>
       <dt>Assegnata a</dt>
-      <dd><input id="f-assignee" placeholder="Nessuno" autocomplete="off" list="team-names" /></dd>
+      <dd><input id="f-assignee" placeholder="Nessuno" autocomplete="off" list="team-names" aria-label="Assegnata a" /></dd>
       <dt>Scadenza</dt>
-      <dd><input id="f-due" type="date" /></dd>
+      <dd><input id="f-due" type="date" aria-label="Scadenza" /></dd>
     </dl>
 
     <h3 class="section-title">Descrizione</h3>
-    <textarea id="f-notes" class="notes" placeholder="Di cosa si tratta?"></textarea>
+    <textarea id="f-notes" class="notes" placeholder="Di cosa si tratta?" aria-label="Descrizione"></textarea>
     <div id="typing-notes" class="typing"></div>
 
     <h3 class="section-title">Checklist <span id="check-count" class="muted"></span></h3>
@@ -96,7 +173,7 @@
     <form method="dialog">
       <h2>Come ti chiami?</h2>
       <p>Il tuo nome appare ai colleghi mentre scrivi.</p>
-      <input id="name-input" required maxlength="30" autocomplete="name" />
+      <input id="name-input" required maxlength="30" autocomplete="name" aria-label="Il tuo nome" />
       <button type="submit">Entra</button>
     </form>
   </dialog>
@@ -104,6 +181,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>
   <script src="store.js"></script>
-  <script src="app.js"></script>
+  <script src="common.js"></script>
+  <script src="board.js"></script>
+  <script src="pages.js"></script>
+  <script src="shell.js"></script>
 </body>
 </html>

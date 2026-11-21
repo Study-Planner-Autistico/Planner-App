@@ -1,40 +1,19 @@
+// Sezione Attività: bacheca con tre colonne, pannello dettagli e checklist.
 (function () {
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-  const uid = () =>
-    crypto.randomUUID ? crypto.randomUUID()
-      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-        });
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const hash = (s) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+  const { $, $$, uid, esc, hash, avatar, me, store, change, saveNow, isPending, cancelSave, flash, typingLabel } = P;
+  const T = "tasks";
 
-  const COLORS = ["#e16259", "#d9730d", "#b8860b", "#448361", "#337ea9", "#9065b0", "#c14c8a", "#4d6461"];
-  const colorFor = (name) => COLORS[hash(name) % COLORS.length];
   const tagClass = (tag) => `tag-${hash(tag.trim().toLowerCase()) % 7}`;
-  const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
-  const avatar = (name, cls = "") =>
-    `<span class="avatar ${cls}" style="background:${colorFor(name)}" title="${esc(name)}">${esc(initials(name))}</span>`;
-
-  // Normalizza le attività (le vecchie non hanno etichetta né checklist).
   const normalize = (t) => ({
     title: "", notes: "", status: "todo", assignee: "", due: null, position: 0, tag: "",
     ...t,
     checklist: Array.isArray(t.checklist) ? t.checklist : [],
   });
 
-  // ---------- Identità ----------
-  const storedName = (() => { try { return localStorage.getItem("planner.name") || ""; } catch { return ""; } })();
-  const me = { id: uid(), name: storedName || "Ospite", color: colorFor(storedName || "Ospite") };
-
-  const store = window.createStore(me);
   const tasks = new Map();
   let openId = null;
-  let people = [me];
-  let filter = (() => { try { return localStorage.getItem("planner.filter") || "all"; } catch { return "all"; } })();
+  let filter = P.local.get("planner.filter", "all");
 
-  // ---------- Bacheca ----------
   const columns = Object.fromEntries($$(".column").map((c) => [c.dataset.status, c]));
   const isMine = (t) => t.assignee.trim().toLowerCase() === me.name.trim().toLowerCase();
 
@@ -44,6 +23,7 @@
       .sort((a, b) => a.position - b.position);
   }
 
+  // ---------- Disegno ----------
   function progressHTML(list) {
     if (!list.length) return "";
     const done = list.filter((c) => c.done).length;
@@ -104,6 +84,7 @@
     const open = [...tasks.values()].filter((t) => t.status !== "done");
     $("#count-all").textContent = open.length || "";
     $("#count-mine").textContent = open.filter(isMine).length || "";
+    $("#nav-count").textContent = open.length || "";
     renderNames();
   }
 
@@ -118,7 +99,7 @@
 
   function renderNames() {
     const all = [...tasks.values()];
-    const names = new Set([...people.map((p) => p.name), ...all.map((t) => t.assignee)].filter(Boolean));
+    const names = new Set([...P.people.map((p) => p.name), ...all.map((t) => t.assignee)].filter(Boolean));
     $("#team-names").innerHTML = [...names].map((n) => `<option value="${esc(n)}"></option>`).join("");
     const tags = new Set(all.map((t) => t.tag).filter(Boolean));
     $("#tag-names").innerHTML = [...tags].map((n) => `<option value="${esc(n)}"></option>`).join("");
@@ -127,7 +108,7 @@
   // ---------- Filtro ----------
   function setFilter(f) {
     filter = f;
-    try { localStorage.setItem("planner.filter", f); } catch {}
+    P.local.set("planner.filter", f);
     $$(".tab").forEach((b) => {
       b.classList.toggle("active", b.dataset.filter === f);
       b.setAttribute("aria-pressed", b.dataset.filter === f);
@@ -135,35 +116,6 @@
     render();
   }
   $$(".tab").forEach((b) => b.addEventListener("click", () => setFilter(b.dataset.filter)));
-
-  // ---------- Salvataggio ----------
-  const timers = new Map();
-  const savedEl = $("#saved");
-
-  function scheduleSave(id, delay = 500) {
-    clearTimeout(timers.get(id));
-    savedEl.textContent = "Salvataggio…";
-    timers.set(id, setTimeout(() => saveNow(id), delay));
-  }
-  async function saveNow(id) {
-    clearTimeout(timers.get(id));
-    timers.delete(id);
-    const t = tasks.get(id);
-    if (!t) return;
-    try {
-      await store.save(t);
-      if (!timers.size) savedEl.textContent = "Salvato";
-    } catch {
-      savedEl.textContent = "Errore di salvataggio — riprova";
-    }
-  }
-
-  // Applica una modifica locale: aggiorna, trasmette subito agli altri, salva.
-  function change(t, field, value, delay = 500) {
-    t[field] = value;
-    store.sendTyping({ id: t.id, field, value, position: t.position, user: me });
-    scheduleSave(t.id, delay);
-  }
 
   // ---------- Creazione ----------
   async function createTask(status) {
@@ -176,9 +128,8 @@
     render();
     openPanel(t.id);
     $("#f-title").focus();
-    await saveNow(t.id);
+    await saveNow(T, t);
   }
-
   for (const col of Object.values(columns)) {
     $(".add", col).addEventListener("click", () => createTask(col.dataset.status));
     $(".cards", col).addEventListener("click", (e) => {
@@ -188,6 +139,7 @@
 
   // ---------- Pannello ----------
   const panel = $("#panel");
+  P.statusEls.add($("#saved"));
   const fields = {
     title: $("#f-title"), notes: $("#f-notes"), status: $("#f-status"),
     tag: $("#f-tag"), assignee: $("#f-assignee"), due: $("#f-due"),
@@ -219,38 +171,37 @@
   function openPanel(id) {
     const t = tasks.get(id);
     if (!t) return;
-    if (openId && openId !== id && timers.has(openId)) saveNow(openId);
+    if (openId && openId !== id && isPending(T, openId)) saveNow(T, tasks.get(openId));
     openId = id;
     fillPanel(t, false);
-    savedEl.textContent = "";
+    $("#saved").textContent = "";
     $("#typing-title").innerHTML = $("#typing-notes").innerHTML = "";
     panel.hidden = false;
     $$(".card").forEach((c) => c.classList.toggle("active", c.dataset.id === id));
   }
   function closePanel() {
-    if (openId && timers.has(openId)) saveNow(openId);
+    if (openId && isPending(T, openId)) saveNow(T, tasks.get(openId));
     openId = null;
     panel.hidden = true;
     $$(".card.active").forEach((c) => c.classList.remove("active"));
   }
 
-  // Clic sulla scheda: apre il pannello, oppure spunta un elemento della checklist.
-  $("#board").addEventListener("click", (e) => {
+  const board = $("#view-tasks");
+  board.addEventListener("click", (e) => {
     const card = e.target.closest(".card");
     if (!card) return;
     const t = tasks.get(card.dataset.id);
     const check = e.target.closest("[data-check]");
     if (check && t) {
       const i = +check.dataset.check;
-      const list = t.checklist.map((c, j) => (j === i ? { ...c, done: !c.done } : c));
-      change(t, "checklist", list, 0);
+      change(T, t, "checklist", t.checklist.map((c, j) => (j === i ? { ...c, done: !c.done } : c)), 0);
       renderCard(t.id);
       if (openId === t.id) renderChecklist(t, true);
       return;
     }
     openPanel(card.dataset.id);
   });
-  $("#board").addEventListener("keydown", (e) => {
+  board.addEventListener("keydown", (e) => {
     const card = e.target.closest(".card");
     if (card && e.target === card && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
@@ -265,12 +216,11 @@
     const t = tasks.get(openId);
     if (!t || !confirm(`Eliminare "${t.title || "Senza titolo"}"?`)) return;
     const id = openId;
-    clearTimeout(timers.get(id));
-    timers.delete(id);
+    cancelSave(T, id);
     tasks.delete(id);
     closePanel();
     render();
-    await store.remove(id);
+    await store.remove(T, id);
   });
 
   for (const [key, el] of Object.entries(fields)) {
@@ -282,14 +232,14 @@
         const last = sorted(el.value, true).filter((x) => x.id !== t.id).at(-1);
         t.position = last ? last.position + 1 : 1;
       }
-      change(t, key, key === "due" ? el.value || null : el.value, evt === "change" ? 0 : 500);
+      change(T, t, key, key === "due" ? el.value || null : el.value, evt === "change" ? 0 : 500, { position: t.position });
       key === "status" || key === "assignee" ? render() : renderCard(t.id);
     });
   }
 
   // Checklist nel pannello
   function updateChecklist(t, list, delay, focusIndex) {
-    change(t, "checklist", list, delay);
+    change(T, t, "checklist", list, delay);
     renderChecklist(t, focusIndex != null);
     renderCard(t.id);
     if (focusIndex != null) $$("input", checklistEl)[focusIndex]?.focus();
@@ -316,7 +266,7 @@
     const li = e.target.closest("li");
     if (!t || !li) return;
     const i = +li.dataset.i;
-    change(t, "checklist", t.checklist.map((c, j) => (j === i ? { ...c, text: e.target.value } : c)));
+    change(T, t, "checklist", t.checklist.map((c, j) => (j === i ? { ...c, text: e.target.value } : c)));
     renderCard(t.id);
   });
   checklistEl.addEventListener("keydown", (e) => {
@@ -337,7 +287,7 @@
 
   // ---------- Trascina e rilascia ----------
   let dragId = null;
-  $("#board").addEventListener("dragstart", (e) => {
+  board.addEventListener("dragstart", (e) => {
     const card = e.target.closest(".card");
     if (!card) return;
     dragId = card.dataset.id;
@@ -345,7 +295,7 @@
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", dragId);
   });
-  $("#board").addEventListener("dragend", () => {
+  board.addEventListener("dragend", () => {
     dragId = null;
     $$(".dragging, .drop").forEach((el) => el.classList.remove("dragging", "drop"));
   });
@@ -371,34 +321,33 @@
       const before = others[index - 1]?.position ?? (others[0] ? others[0].position - 1 : 0);
       const after = others[index]?.position ?? before + 2;
       t.position = (before + after) / 2;
-      change(t, "status", col.dataset.status, 0);
+      change(T, t, "status", col.dataset.status, 0, { position: t.position });
       render();
       if (openId === t.id) fields.status.value = t.status;
     });
   }
 
   // ---------- Modifiche degli altri, in tempo reale ----------
-  const typingTimers = {};
   function showTyping(id, field, user) {
-    const card = $(`.card[data-id="${id}"]`);
-    if (card) {
-      let tag = $(".card-typing", card);
-      if (!tag) { tag = document.createElement("span"); tag.className = "card-typing"; card.appendChild(tag); }
-      tag.textContent = `${user.name} ✎`;
-      tag.style.background = user.color;
-    }
-    const slot = openId === id && (field === "title" || field === "notes") ? $(`#typing-${field}`) : null;
-    if (slot) slot.innerHTML = `<span style="color:${esc(user.color)}">✎ ${esc(user.name)} sta scrivendo…</span>`;
-    clearTimeout(typingTimers[id]);
-    typingTimers[id] = setTimeout(() => {
+    flash(`task:${id}`, () => {
+      const card = $(`.card[data-id="${id}"]`);
+      if (card) {
+        let tag = $(".card-typing", card);
+        if (!tag) { tag = document.createElement("span"); tag.className = "card-typing"; card.appendChild(tag); }
+        tag.textContent = `${user.name} ✎`;
+        tag.style.background = user.color;
+      }
+      if (openId === id && (field === "title" || field === "notes")) $(`#typing-${field}`).innerHTML = typingLabel(user);
+    }, () => {
       $(`.card[data-id="${id}"] .card-typing`)?.remove();
       $("#typing-title").innerHTML = $("#typing-notes").innerHTML = "";
-    }, 1500);
+    });
   }
 
-  store.onTyping(({ id, field, value, position, user }) => {
+  store.onTyping(({ table, id, field, value, position, user }) => {
+    if (table && table !== T) return;
     const t = tasks.get(id);
-    if (!t) return;
+    if (!t || !(field in fields || field === "checklist")) return;
     const moved = (field === "status" && t.status !== value) || field === "assignee";
     t[field] = value;
     if (position != null) t.position = position;
@@ -410,54 +359,28 @@
     if (["title", "notes", "checklist"].includes(field)) showTyping(id, field, user);
   });
 
-  store.onTask(({ type, task }) => {
+  store.onRow(({ table, type, row }) => {
+    if (table !== T) return;
     if (type === "delete") {
-      tasks.delete(task.id);
-      if (openId === task.id) closePanel();
+      tasks.delete(row.id);
+      if (openId === row.id) closePanel();
       return render();
     }
-    if (timers.has(task.id)) return; // abbiamo modifiche locali non ancora salvate
-    tasks.set(task.id, normalize({ ...tasks.get(task.id), ...task }));
+    if (isPending(T, row.id)) return; // abbiamo modifiche locali non ancora salvate
+    tasks.set(row.id, normalize({ ...tasks.get(row.id), ...row }));
     render();
-    if (openId === task.id) fillPanel(tasks.get(task.id));
+    if (openId === row.id) fillPanel(tasks.get(row.id));
   });
 
-  store.onPeople((list) => {
-    people = list.filter(Boolean);
-    $("#people").innerHTML = people.filter((p) => p.id !== me.id).map((p) => avatar(p.name)).join("");
-    renderNames();
-  });
-
-  // ---------- Nome ----------
-  const dialog = $("#name-dialog");
-  function askName() {
-    $("#name-input").value = storedName ? me.name : "";
-    dialog.showModal();
-  }
-  dialog.addEventListener("close", () => {
-    const name = $("#name-input").value.trim();
-    if (!name || name === storedName) return;
-    try { localStorage.setItem("planner.name", name); } catch {}
-    location.reload(); // riannuncia la presenza con il nuovo nome
-  });
-  $("#me").innerHTML = `${avatar(me.name)}<span class="me-name">${esc(me.name)}</span>`;
-  $("#me").addEventListener("click", askName);
-
-  // ---------- Avvio ----------
-  const modeEl = $("#mode");
-  if (store.mode === "live") {
-    modeEl.textContent = "Live";
-    modeEl.classList.add("live");
-    modeEl.title = "Sincronizzato in tempo reale con il team";
-  } else {
-    modeEl.textContent = "Locale";
-    modeEl.title = "Dati solo su questo computer. Configura Supabase in config.js per lavorare in team.";
-  }
-
+  P.board = {
+    async load() {
+      const list = await store.list(T);
+      list.forEach((t) => tasks.set(t.id, normalize(t)));
+      setFilter(filter);
+    },
+    render,
+    renderNames,
+    close: closePanel,
+  };
   setFilter(filter);
-  store.list()
-    .then((list) => { list.forEach((t) => tasks.set(t.id, normalize(t))); render(); })
-    .catch(() => { modeEl.textContent = "Errore di connessione"; });
-
-  if (!storedName) askName();
 })();

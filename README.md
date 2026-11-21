@@ -1,7 +1,14 @@
 # Planner App
 
-Una bacheca semplice, stile Notion, per gestire le attività del team.
+Uno spazio di lavoro semplice, stile Notion, per il team: una barra laterale con
+la sezione **Attività** e le **Pagine** condivise.
 
+**Pagine**
+- Documenti liberi con icona, titolo e testo, elencati nella barra laterale
+- **Allegati**: trascina i file nella pagina (fino a 25 MB ciascuno), con anteprima delle immagini
+- Si vede in tempo reale chi sta scrivendo e in quale pagina
+
+**Attività**
 - Tre colonne: **Da fare**, **In corso**, **Completate** (trascina le schede per spostarle)
 - Ogni attività ha titolo, descrizione, etichetta colorata, persona assegnata e scadenza
 - **Checklist** con barra di avanzamento: le voci si spuntano anche direttamente dalla scheda
@@ -57,16 +64,20 @@ Condividi quel link con il team.
 ## Sicurezza
 
 Con la configurazione di `supabase.sql` chiunque abbia il link dell'app può
-leggere e modificare le attività. Va bene per un team piccolo con un link non
-pubblico. Se serve un accesso con login, si può aggiungere Supabase Auth.
+leggere e modificare attività e pagine, e aprire gli allegati. Va bene per un
+team piccolo con un link non pubblico. Se serve un accesso con login, si può
+aggiungere Supabase Auth.
 
 ## File
 
 | File | Cosa contiene |
 | --- | --- |
-| `index.html` | Struttura della pagina |
-| `style.css` | Aspetto (chiaro/scuro) |
-| `app.js` | Bacheca, pannello attività, trascinamento, indicatori "sta scrivendo" |
-| `store.js` | Salvataggio e tempo reale (locale o Supabase) |
+| `index.html` | Struttura: barra laterale, bacheca, editor delle pagine |
+| `style.css` | Aspetto (chiaro/scuro, telefono) |
+| `common.js` | Strumenti condivisi: identità, salvataggio, indicatori "sta scrivendo" |
+| `board.js` | Bacheca attività, pannello dettagli, checklist, trascinamento |
+| `pages.js` | Pagine: editor, icona, allegati |
+| `shell.js` | Navigazione, intestazione, persone online |
+| `store.js` | Salvataggio, file e tempo reale (locale o Supabase) |
 | `config.js` | Chiavi di Supabase |
-| `supabase.sql` | Tabella e permessi da creare su Supabase |
+| `supabase.sql` | Tabelle, permessi e spazio allegati da creare su Supabase |

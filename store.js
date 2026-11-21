@@ -1,28 +1,35 @@
 // Livello dati: stessa interfaccia per la modalità locale e per Supabase.
 //
-//   store.mode                       "live" | "local"
-//   store.list()                     -> Promise<Task[]>
-//   store.save(task)                 salva (insert o update)
-//   store.remove(id)
-//   store.onTask(cb)                 cb({type:"upsert"|"delete", task})  modifiche di altri
-//   store.sendTyping(payload)        trasmette ciò che si sta scrivendo, lettera per lettera
+//   store.mode                         "live" | "local"
+//   store.list(table)                  -> Promise<Row[]>      table: "tasks" | "pages"
+//   store.save(table, row)             salva (insert o update)
+//   store.remove(table, id)
+//   store.upload(folder, file)         -> Promise<{name,size,type,path,url}>
+//   store.removeFile(path)
+//   store.onRow(cb)                    cb({table, type:"upsert"|"delete", row})  modifiche di altri
+//   store.sendTyping(payload)          trasmette ciò che si sta scrivendo, lettera per lettera
 //   store.onTyping(cb)
-//   store.onPeople(cb)               cb([{id,name,color}])  chi è online
+//   store.onPeople(cb)                 cb([{id,name,color}])  chi è online
 
 (function () {
   const cfg = window.PLANNER_CONFIG || {};
+  const MAX_LOCAL_FILE = 1024 * 1024; // in modalità locale i file finiscono nel browser: massimo 1 MB
+
+  const safeName = (name) =>
+    name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
+  const rand = () => Math.random().toString(36).slice(2, 10);
 
   function createLocalStore(me) {
-    const KEY = "planner.tasks";
+    const key = (table) => `planner.${table}`;
     const bc = "BroadcastChannel" in window ? new BroadcastChannel("planner-app") : null;
-    const listeners = { task: [], typing: [], people: [] };
+    const listeners = { row: [], typing: [], people: [] };
     const peers = new Map();
 
-    const read = () => {
-      try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
+    const read = (table) => {
+      try { return JSON.parse(localStorage.getItem(key(table)) || "[]"); } catch { return []; }
     };
-    const write = (tasks) => {
-      try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch {}
+    const write = (table, rows) => {
+      try { localStorage.setItem(key(table), JSON.stringify(rows)); return true; } catch { return false; }
     };
     const emit = (kind, data) => listeners[kind].forEach((cb) => cb(data));
     const post = (msg) => bc && bc.postMessage(msg);
@@ -35,7 +42,7 @@
 
     if (bc) {
       bc.onmessage = ({ data }) => {
-        if (data.kind === "task") emit("task", data.payload);
+        if (data.kind === "row") emit("row", data.payload);
         if (data.kind === "typing") emit("typing", data.payload);
         if (data.kind === "hello") {
           const known = peers.has(data.payload.id);
@@ -53,20 +60,31 @@
 
     return {
       mode: "local",
-      async list() { return read(); },
-      async save(task) {
-        const tasks = read();
-        const i = tasks.findIndex((t) => t.id === task.id);
-        if (i >= 0) tasks[i] = task; else tasks.push(task);
-        write(tasks);
-        post({ kind: "task", payload: { type: "upsert", task } });
+      async list(table) { return read(table); },
+      async save(table, row) {
+        const rows = read(table);
+        const i = rows.findIndex((r) => r.id === row.id);
+        if (i >= 0) rows[i] = row; else rows.push(row);
+        if (!write(table, rows)) throw new Error("Spazio del browser esaurito");
+        post({ kind: "row", payload: { table, type: "upsert", row } });
       },
-      async remove(id) {
-        write(read().filter((t) => t.id !== id));
-        post({ kind: "task", payload: { type: "delete", task: { id } } });
+      async remove(table, id) {
+        write(table, read(table).filter((r) => r.id !== id));
+        post({ kind: "row", payload: { table, type: "delete", row: { id } } });
       },
+      async upload(folder, file) {
+        if (file.size > MAX_LOCAL_FILE) throw new Error("In modalità locale i file possono pesare al massimo 1 MB");
+        const url = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        return { name: file.name, size: file.size, type: file.type, path: `${folder}/${rand()}-${safeName(file.name)}`, url };
+      },
+      async removeFile() {},
       sendTyping(payload) { post({ kind: "typing", payload }); },
-      onTask(cb) { listeners.task.push(cb); },
+      onRow(cb) { listeners.row.push(cb); },
       onTyping(cb) { listeners.typing.push(cb); },
       onPeople(cb) { listeners.people.push(cb); },
     };
@@ -74,7 +92,8 @@
 
   function createSupabaseStore(me) {
     const db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-    const listeners = { task: [], typing: [], people: [] };
+    const bucket = db.storage.from("attachments");
+    const listeners = { row: [], typing: [], people: [] };
     const emit = (kind, data) => listeners[kind].forEach((cb) => cb(data));
 
     const channel = db.channel("planner-app", {
@@ -82,10 +101,11 @@
     });
 
     channel
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (p) => {
-        if (p.eventType === "DELETE") return emit("task", { type: "delete", task: p.old });
+      .on("postgres_changes", { event: "*", schema: "public" }, (p) => {
+        if (p.table !== "tasks" && p.table !== "pages") return;
+        if (p.eventType === "DELETE") return emit("row", { table: p.table, type: "delete", row: p.old });
         if (p.new.updated_by === me.id) return; // è il nostro salvataggio che torna indietro
-        emit("task", { type: "upsert", task: p.new });
+        emit("row", { table: p.table, type: "upsert", row: p.new });
       })
       .on("broadcast", { event: "typing" }, ({ payload }) => emit("typing", payload))
       .on("presence", { event: "sync" }, () => {
@@ -96,21 +116,29 @@
         if (status === "SUBSCRIBED") channel.track(me);
       });
 
-    const check = ({ error }) => { if (error) { console.error(error); throw error; } };
+    const check = ({ error, data }) => {
+      if (error) { console.error(error); throw error; }
+      return data;
+    };
 
     return {
       mode: "live",
-      async list() {
-        const res = await db.from("tasks").select("*").order("position");
-        check(res);
-        return res.data;
+      async list(table) {
+        return check(await db.from(table).select("*").order("position"));
       },
-      async save(task) {
-        check(await db.from("tasks").upsert({ ...task, updated_by: me.id, updated_at: new Date().toISOString() }));
+      async save(table, row) {
+        check(await db.from(table).upsert({ ...row, updated_by: me.id, updated_at: new Date().toISOString() }));
       },
-      async remove(id) { check(await db.from("tasks").delete().eq("id", id)); },
+      async remove(table, id) { check(await db.from(table).delete().eq("id", id)); },
+      async upload(folder, file) {
+        const path = `${folder}/${rand()}-${safeName(file.name)}`;
+        check(await bucket.upload(path, file, { contentType: file.type || undefined, upsert: false }));
+        const url = bucket.getPublicUrl(path).data.publicUrl;
+        return { name: file.name, size: file.size, type: file.type, path, url };
+      },
+      async removeFile(path) { check(await bucket.remove([path])); },
       sendTyping(payload) { channel.send({ type: "broadcast", event: "typing", payload }); },
-      onTask(cb) { listeners.task.push(cb); },
+      onRow(cb) { listeners.row.push(cb); },
       onTyping(cb) { listeners.typing.push(cb); },
       onPeople(cb) { listeners.people.push(cb); },
     };
