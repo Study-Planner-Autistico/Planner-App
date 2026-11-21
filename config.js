@@ -5,8 +5,9 @@
 //
 // Per la collaborazione in tempo reale con il team, crea un progetto gratuito
 // su https://supabase.com, esegui il file supabase.sql e incolla qui sotto
-// l'URL del progetto e la chiave "anon public" (Project Settings → API).
+// l'URL del progetto e la chiave pubblica ("publishable" o "anon public").
+// Non inserire mai la chiave "secret" o "service_role".
 window.PLANNER_CONFIG = {
-  supabaseUrl: "",
-  supabaseAnonKey: "",
+  supabaseUrl: "https://iwpahoohpkiycjwmxgqt.supabase.co",
+  supabaseAnonKey: "sb_publishable_rp94TVZlXsIVY05VcUtuAA_JsUr8z6M",
 };

@@ -23,6 +23,10 @@ alter publication supabase_realtime add table public.tasks;
 -- Va bene per un team piccolo; per limitare l'accesso aggiungi Supabase Auth.
 alter table public.tasks enable row level security;
 
+-- I progetti Supabase recenti non danno più accesso automatico alle tabelle:
+-- permetti alle chiavi pubbliche (publishable/anon) di usare la tabella.
+grant select, insert, update, delete on public.tasks to anon, authenticated;
+
 drop policy if exists "team can read"   on public.tasks;
 drop policy if exists "team can write"  on public.tasks;
 
