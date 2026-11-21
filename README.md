@@ -2,8 +2,10 @@
 
 Una bacheca semplice, stile Notion, per gestire le attività del team.
 
-- Tre colonne: **Da fare**, **In corso**, **Fatto** (trascina le schede per spostarle)
-- Ogni attività ha titolo, persona assegnata, scadenza e note libere
+- Tre colonne: **Da fare**, **In corso**, **Completate** (trascina le schede per spostarle)
+- Ogni attività ha titolo, descrizione, etichetta colorata, persona assegnata e scadenza
+- **Checklist** con barra di avanzamento: le voci si spuntano anche direttamente dalla scheda
+- Filtro **Tutte / Assegnate a me**
 - **Tempo reale**: vedi lettera per lettera cosa scrivono i colleghi, con il loro nome
 - Avatar di chi è online in questo momento
 - Tema chiaro e scuro automatico, funziona anche da telefono
@@ -14,6 +16,9 @@ Nessuna installazione: sono file HTML, CSS e JavaScript.
 
 Apri `index.html` nel browser. I dati restano su quel computer e si
 sincronizzano tra le schede aperte: utile per provarla, non per il team.
+
+Con Supabase configurato, aggiungi `?local` all'indirizzo per provare l'app
+senza toccare i dati del team.
 
 ## Attivare il tempo reale per il team (Supabase, gratis)
 

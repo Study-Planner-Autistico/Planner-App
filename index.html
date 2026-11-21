@@ -4,36 +4,53 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Planner App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">▦</span>
-      <h1>Planner App</h1>
-      <span id="mode" class="badge"></span>
+    <div class="topbar-row">
+      <div class="brand">
+        <div class="ws-icon" aria-hidden="true">SP</div>
+        <div>
+          <h1>Study Planner <span id="mode" class="badge"></span></h1>
+          <p class="sub">Attività del team</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div id="people" class="people" aria-label="Persone online"></div>
+        <button id="me" class="me-btn" type="button" title="Cambia nome"></button>
+      </div>
     </div>
-    <div class="topbar-right">
-      <div id="people" class="people" aria-label="Persone online"></div>
-      <button id="me" class="me-btn" type="button" title="Cambia nome"></button>
-    </div>
+    <nav class="tabs" aria-label="Filtro attività">
+      <button class="tab active" type="button" data-filter="all">Tutte <span class="tab-count" id="count-all"></span></button>
+      <button class="tab" type="button" data-filter="mine">Assegnate a me <span class="tab-count" id="count-mine"></span></button>
+    </nav>
   </header>
 
   <main class="board" id="board">
     <section class="column" data-status="todo">
-      <header class="column-head"><span class="dot dot-todo"></span><h2>Da fare</h2><span class="count"></span></header>
+      <header class="column-head">
+        <span class="dot dot-todo"></span><h2>Da fare</h2><span class="count"></span>
+        <button class="add" type="button" aria-label="Nuova attività in Da fare">+</button>
+      </header>
       <div class="cards"></div>
-      <button class="add" type="button">+ Nuova attività</button>
     </section>
     <section class="column" data-status="doing">
-      <header class="column-head"><span class="dot dot-doing"></span><h2>In corso</h2><span class="count"></span></header>
+      <header class="column-head">
+        <span class="dot dot-doing"></span><h2>In corso</h2><span class="count"></span>
+        <button class="add" type="button" aria-label="Nuova attività in In corso">+</button>
+      </header>
       <div class="cards"></div>
-      <button class="add" type="button">+ Nuova attività</button>
     </section>
     <section class="column" data-status="done">
-      <header class="column-head"><span class="dot dot-done"></span><h2>Fatto</h2><span class="count"></span></header>
+      <header class="column-head">
+        <span class="dot dot-done"></span><h2>Completate</h2><span class="count"></span>
+        <button class="add" type="button" aria-label="Nuova attività in Completate">+</button>
+      </header>
       <div class="cards"></div>
-      <button class="add" type="button">+ Nuova attività</button>
     </section>
   </main>
 
@@ -51,17 +68,28 @@
         <select id="f-status">
           <option value="todo">Da fare</option>
           <option value="doing">In corso</option>
-          <option value="done">Fatto</option>
+          <option value="done">Completata</option>
         </select>
       </dd>
-      <dt>Assegnato a</dt>
+      <dt>Etichetta</dt>
+      <dd><input id="f-tag" placeholder="Es. Studio, Esame…" autocomplete="off" list="tag-names" maxlength="24" /></dd>
+      <dt>Assegnata a</dt>
       <dd><input id="f-assignee" placeholder="Nessuno" autocomplete="off" list="team-names" /></dd>
       <dt>Scadenza</dt>
       <dd><input id="f-due" type="date" /></dd>
     </dl>
-    <textarea id="f-notes" class="notes" placeholder="Scrivi note, checklist, link…"></textarea>
+
+    <h3 class="section-title">Descrizione</h3>
+    <textarea id="f-notes" class="notes" placeholder="Di cosa si tratta?"></textarea>
     <div id="typing-notes" class="typing"></div>
+
+    <h3 class="section-title">Checklist <span id="check-count" class="muted"></span></h3>
+    <div class="progress" id="panel-progress" hidden><div class="bar"><span></span></div></div>
+    <ul id="checklist" class="checklist"></ul>
+    <button id="add-check" class="add-check" type="button">+ Aggiungi elemento</button>
+
     <datalist id="team-names"></datalist>
+    <datalist id="tag-names"></datalist>
   </aside>
 
   <dialog id="name-dialog">

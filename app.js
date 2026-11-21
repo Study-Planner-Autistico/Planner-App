@@ -8,14 +8,21 @@
           return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
         });
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const hash = (s) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 
-  const COLORS = ["#e16259", "#d9730d", "#cb912f", "#448361", "#337ea9", "#9065b0", "#c14c8a", "#4d6461"];
-  const colorFor = (name) => {
-    let h = 0;
-    for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return COLORS[h % COLORS.length];
-  };
+  const COLORS = ["#e16259", "#d9730d", "#b8860b", "#448361", "#337ea9", "#9065b0", "#c14c8a", "#4d6461"];
+  const colorFor = (name) => COLORS[hash(name) % COLORS.length];
+  const tagClass = (tag) => `tag-${hash(tag.trim().toLowerCase()) % 7}`;
   const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  const avatar = (name, cls = "") =>
+    `<span class="avatar ${cls}" style="background:${colorFor(name)}" title="${esc(name)}">${esc(initials(name))}</span>`;
+
+  // Normalizza le attività (le vecchie non hanno etichetta né checklist).
+  const normalize = (t) => ({
+    title: "", notes: "", status: "todo", assignee: "", due: null, position: 0, tag: "",
+    ...t,
+    checklist: Array.isArray(t.checklist) ? t.checklist : [],
+  });
 
   // ---------- Identità ----------
   const storedName = (() => { try { return localStorage.getItem("planner.name") || ""; } catch { return ""; } })();
@@ -25,26 +32,53 @@
   const tasks = new Map();
   let openId = null;
   let people = [me];
+  let filter = (() => { try { return localStorage.getItem("planner.filter") || "all"; } catch { return "all"; } })();
 
   // ---------- Bacheca ----------
   const columns = Object.fromEntries($$(".column").map((c) => [c.dataset.status, c]));
+  const isMine = (t) => t.assignee.trim().toLowerCase() === me.name.trim().toLowerCase();
 
-  function sorted(status) {
-    return [...tasks.values()].filter((t) => t.status === status).sort((a, b) => a.position - b.position);
+  function sorted(status, all = false) {
+    return [...tasks.values()]
+      .filter((t) => t.status === status && (all || filter === "all" || isMine(t)))
+      .sort((a, b) => a.position - b.position);
+  }
+
+  function progressHTML(list) {
+    if (!list.length) return "";
+    const done = list.filter((c) => c.done).length;
+    return `
+      <div class="progress">
+        <div class="progress-head"><span>Avanzamento</span><b>${done}/${list.length}</b></div>
+        <div class="bar"><span style="width:${(done / list.length) * 100}%"></span></div>
+      </div>`;
   }
 
   function cardHTML(t) {
     const today = new Date().toISOString().slice(0, 10);
-    const meta = [];
-    if (t.assignee) meta.push(`<span class="chip">${esc(t.assignee)}</span>`);
+    const checks = t.checklist.slice(0, 4).map((c, i) => `
+      <li><button type="button" class="check${c.done ? " done" : ""}" data-check="${i}" aria-pressed="${c.done}"
+        aria-label="${c.done ? "Segna da fare" : "Segna fatto"}: ${esc(c.text)}"></button>
+        <span class="check-text">${esc(c.text) || "&nbsp;"}</span></li>`).join("");
+    const more = t.checklist.length > 4 ? `<li class="more">+ altri ${t.checklist.length - 4}</li>` : "";
+
+    let due = "";
     if (t.due) {
       const late = t.due < today && t.status !== "done";
       const d = new Date(t.due + "T00:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" });
-      meta.push(`<span class="chip${late ? " late" : ""}">${late ? "Scaduta · " : ""}${esc(d)}</span>`);
+      due = `<span class="due${late ? " late" : ""}" title="Scadenza">${late ? "Scaduta · " : ""}${esc(d)}</span>`;
     }
+    const foot = [
+      t.tag ? `<span class="tag ${tagClass(t.tag)}">${esc(t.tag)}</span>` : "",
+      (due || t.assignee) ? `<span class="spacer"></span>${due}${t.assignee ? avatar(t.assignee, "sm") : ""}` : "",
+    ].join("");
+
     return `
-      <div class="card-title${t.title ? "" : " empty"}">${t.title ? esc(t.title) : "Senza titolo"}</div>
-      ${meta.length ? `<div class="card-meta">${meta.join("")}</div>` : ""}`;
+      <h3 class="card-title${t.title ? "" : " empty"}">${t.title ? esc(t.title) : "Senza titolo"}</h3>
+      ${t.notes ? `<p class="card-desc">${esc(t.notes)}</p>` : ""}
+      ${checks ? `<ul class="card-checks">${checks}${more}</ul>` : ""}
+      ${progressHTML(t.checklist)}
+      ${foot ? `<div class="card-foot">${foot}</div>` : ""}`;
   }
 
   function render() {
@@ -54,15 +88,22 @@
       const box = $(".cards", col);
       box.innerHTML = "";
       for (const t of list) {
-        const el = document.createElement("button");
-        el.type = "button";
+        const el = document.createElement("article");
         el.className = "card" + (t.id === openId ? " active" : "");
         el.dataset.id = t.id;
+        el.tabIndex = 0;
         el.draggable = true;
+        el.setAttribute("aria-label", t.title || "Senza titolo");
         el.innerHTML = cardHTML(t);
         box.appendChild(el);
       }
+      if (!list.length) {
+        box.innerHTML = `<button type="button" class="empty-col">${filter === "mine" ? "Nessuna attività assegnata a te" : "+ Aggiungi un'attività"}</button>`;
+      }
     }
+    const open = [...tasks.values()].filter((t) => t.status !== "done");
+    $("#count-all").textContent = open.length || "";
+    $("#count-mine").textContent = open.filter(isMine).length || "";
     renderNames();
   }
 
@@ -70,13 +111,30 @@
     const t = tasks.get(id);
     const el = $(`.card[data-id="${id}"]`);
     if (!t || !el || el.closest(".column").dataset.status !== t.status) return render();
+    const tag = $(".card-typing", el);
     el.innerHTML = cardHTML(t);
+    if (tag) el.appendChild(tag);
   }
 
   function renderNames() {
-    const names = new Set([...people.map((p) => p.name), ...[...tasks.values()].map((t) => t.assignee)].filter(Boolean));
+    const all = [...tasks.values()];
+    const names = new Set([...people.map((p) => p.name), ...all.map((t) => t.assignee)].filter(Boolean));
     $("#team-names").innerHTML = [...names].map((n) => `<option value="${esc(n)}"></option>`).join("");
+    const tags = new Set(all.map((t) => t.tag).filter(Boolean));
+    $("#tag-names").innerHTML = [...tags].map((n) => `<option value="${esc(n)}"></option>`).join("");
   }
+
+  // ---------- Filtro ----------
+  function setFilter(f) {
+    filter = f;
+    try { localStorage.setItem("planner.filter", f); } catch {}
+    $$(".tab").forEach((b) => {
+      b.classList.toggle("active", b.dataset.filter === f);
+      b.setAttribute("aria-pressed", b.dataset.filter === f);
+    });
+    render();
+  }
+  $$(".tab").forEach((b) => b.addEventListener("click", () => setFilter(b.dataset.filter)));
 
   // ---------- Salvataggio ----------
   const timers = new Map();
@@ -88,6 +146,7 @@
     timers.set(id, setTimeout(() => saveNow(id), delay));
   }
   async function saveNow(id) {
+    clearTimeout(timers.get(id));
     timers.delete(id);
     const t = tasks.get(id);
     if (!t) return;
@@ -99,13 +158,20 @@
     }
   }
 
+  // Applica una modifica locale: aggiorna, trasmette subito agli altri, salva.
+  function change(t, field, value, delay = 500) {
+    t[field] = value;
+    store.sendTyping({ id: t.id, field, value, position: t.position, user: me });
+    scheduleSave(t.id, delay);
+  }
+
   // ---------- Creazione ----------
   async function createTask(status) {
-    const last = sorted(status).at(-1);
-    const t = {
-      id: uid(), title: "", notes: "", status, assignee: "", due: null,
-      position: last ? last.position + 1 : 1,
-    };
+    const last = sorted(status, true).at(-1);
+    const t = normalize({
+      id: uid(), status, position: last ? last.position + 1 : 1,
+      assignee: filter === "mine" ? me.name : "",
+    });
     tasks.set(t.id, t);
     render();
     openPanel(t.id);
@@ -113,24 +179,47 @@
     await saveNow(t.id);
   }
 
-  $$(".add").forEach((btn) => btn.addEventListener("click", () => createTask(btn.closest(".column").dataset.status)));
+  for (const col of Object.values(columns)) {
+    $(".add", col).addEventListener("click", () => createTask(col.dataset.status));
+    $(".cards", col).addEventListener("click", (e) => {
+      if (e.target.closest(".empty-col")) createTask(col.dataset.status);
+    });
+  }
 
   // ---------- Pannello ----------
   const panel = $("#panel");
   const fields = {
     title: $("#f-title"), notes: $("#f-notes"), status: $("#f-status"),
-    assignee: $("#f-assignee"), due: $("#f-due"),
+    tag: $("#f-tag"), assignee: $("#f-assignee"), due: $("#f-due"),
   };
+  const checklistEl = $("#checklist");
+
+  function renderChecklist(t, force = false) {
+    const p = $("#panel-progress");
+    const done = t.checklist.filter((c) => c.done).length;
+    $("#check-count").textContent = t.checklist.length ? `${done}/${t.checklist.length}` : "";
+    p.hidden = !t.checklist.length;
+    $("span", p).style.width = t.checklist.length ? `${(done / t.checklist.length) * 100}%` : "0";
+    if (!force && checklistEl.contains(document.activeElement)) return; // non disturbare chi sta scrivendo
+    checklistEl.innerHTML = t.checklist.map((c, i) => `
+      <li class="${c.done ? "is-done" : ""}" data-i="${i}">
+        <button type="button" class="check${c.done ? " done" : ""}" aria-pressed="${c.done}" aria-label="Fatto"></button>
+        <input value="${esc(c.text)}" placeholder="Elemento" aria-label="Elemento ${i + 1}" />
+        <button type="button" class="remove-check" aria-label="Rimuovi elemento">✕</button>
+      </li>`).join("");
+  }
 
   function fillPanel(t, skipFocused = true) {
     for (const [key, el] of Object.entries(fields)) {
       if (skipFocused && document.activeElement === el) continue;
       el.value = t[key] ?? "";
     }
+    renderChecklist(t, !skipFocused);
   }
   function openPanel(id) {
     const t = tasks.get(id);
     if (!t) return;
+    if (openId && openId !== id && timers.has(openId)) saveNow(openId);
     openId = id;
     fillPanel(t, false);
     savedEl.textContent = "";
@@ -145,9 +234,28 @@
     $$(".card.active").forEach((c) => c.classList.remove("active"));
   }
 
+  // Clic sulla scheda: apre il pannello, oppure spunta un elemento della checklist.
   $("#board").addEventListener("click", (e) => {
     const card = e.target.closest(".card");
-    if (card) openPanel(card.dataset.id);
+    if (!card) return;
+    const t = tasks.get(card.dataset.id);
+    const check = e.target.closest("[data-check]");
+    if (check && t) {
+      const i = +check.dataset.check;
+      const list = t.checklist.map((c, j) => (j === i ? { ...c, done: !c.done } : c));
+      change(t, "checklist", list, 0);
+      renderCard(t.id);
+      if (openId === t.id) renderChecklist(t, true);
+      return;
+    }
+    openPanel(card.dataset.id);
+  });
+  $("#board").addEventListener("keydown", (e) => {
+    const card = e.target.closest(".card");
+    if (card && e.target === card && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      openPanel(card.dataset.id);
+    }
   });
   $("#close").addEventListener("click", closePanel);
   document.addEventListener("keydown", (e) => {
@@ -170,19 +278,62 @@
     el.addEventListener(evt, () => {
       const t = tasks.get(openId);
       if (!t) return;
-      t[key] = key === "due" ? el.value || null : el.value;
       if (key === "status") {
-        const last = sorted(el.value).filter((x) => x.id !== t.id).at(-1);
+        const last = sorted(el.value, true).filter((x) => x.id !== t.id).at(-1);
         t.position = last ? last.position + 1 : 1;
-        render();
-      } else {
-        renderCard(t.id);
       }
-      // Trasmette subito ciò che si sta scrivendo, il salvataggio arriva poco dopo.
-      store.sendTyping({ id: t.id, field: key, value: t[key], position: t.position, user: me });
-      scheduleSave(t.id, evt === "change" ? 0 : 500);
+      change(t, key, key === "due" ? el.value || null : el.value, evt === "change" ? 0 : 500);
+      key === "status" || key === "assignee" ? render() : renderCard(t.id);
     });
   }
+
+  // Checklist nel pannello
+  function updateChecklist(t, list, delay, focusIndex) {
+    change(t, "checklist", list, delay);
+    renderChecklist(t, focusIndex != null);
+    renderCard(t.id);
+    if (focusIndex != null) $$("input", checklistEl)[focusIndex]?.focus();
+  }
+  $("#add-check").addEventListener("click", () => {
+    const t = tasks.get(openId);
+    if (t) updateChecklist(t, [...t.checklist, { id: uid(), text: "", done: false }], 0, t.checklist.length);
+  });
+  checklistEl.addEventListener("click", (e) => {
+    const t = tasks.get(openId);
+    const li = e.target.closest("li");
+    if (!t || !li) return;
+    const i = +li.dataset.i;
+    if (e.target.closest(".check")) {
+      updateChecklist(t, t.checklist.map((c, j) => (j === i ? { ...c, done: !c.done } : c)), 0);
+      renderChecklist(t, true);
+    } else if (e.target.closest(".remove-check")) {
+      updateChecklist(t, t.checklist.filter((_, j) => j !== i), 0);
+      renderChecklist(t, true);
+    }
+  });
+  checklistEl.addEventListener("input", (e) => {
+    const t = tasks.get(openId);
+    const li = e.target.closest("li");
+    if (!t || !li) return;
+    const i = +li.dataset.i;
+    change(t, "checklist", t.checklist.map((c, j) => (j === i ? { ...c, text: e.target.value } : c)));
+    renderCard(t.id);
+  });
+  checklistEl.addEventListener("keydown", (e) => {
+    const t = tasks.get(openId);
+    const li = e.target.closest("li");
+    if (!t || !li || e.target.tagName !== "INPUT") return;
+    const i = +li.dataset.i;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const list = [...t.checklist];
+      list.splice(i + 1, 0, { id: uid(), text: "", done: false });
+      updateChecklist(t, list, 0, i + 1);
+    } else if (e.key === "Backspace" && e.target.value === "") {
+      e.preventDefault();
+      updateChecklist(t, t.checklist.filter((_, j) => j !== i), 0, Math.max(0, i - 1));
+    }
+  });
 
   // ---------- Trascina e rilascia ----------
   let dragId = null;
@@ -219,19 +370,16 @@
       if (index < 0) index = others.length;
       const before = others[index - 1]?.position ?? (others[0] ? others[0].position - 1 : 0);
       const after = others[index]?.position ?? before + 2;
-      t.status = col.dataset.status;
       t.position = (before + after) / 2;
+      change(t, "status", col.dataset.status, 0);
       render();
       if (openId === t.id) fields.status.value = t.status;
-      store.sendTyping({ id: t.id, field: "status", value: t.status, position: t.position, user: me });
-      saveNow(t.id);
     });
   }
 
   // ---------- Modifiche degli altri, in tempo reale ----------
   const typingTimers = {};
   function showTyping(id, field, user) {
-    const label = `<span style="color:${esc(user.color)}">✎ ${esc(user.name)} sta scrivendo…</span>`;
     const card = $(`.card[data-id="${id}"]`);
     if (card) {
       let tag = $(".card-typing", card);
@@ -240,7 +388,7 @@
       tag.style.background = user.color;
     }
     const slot = openId === id && (field === "title" || field === "notes") ? $(`#typing-${field}`) : null;
-    if (slot) slot.innerHTML = label;
+    if (slot) slot.innerHTML = `<span style="color:${esc(user.color)}">✎ ${esc(user.name)} sta scrivendo…</span>`;
     clearTimeout(typingTimers[id]);
     typingTimers[id] = setTimeout(() => {
       $(`.card[data-id="${id}"] .card-typing`)?.remove();
@@ -251,12 +399,15 @@
   store.onTyping(({ id, field, value, position, user }) => {
     const t = tasks.get(id);
     if (!t) return;
-    const statusChanged = field === "status" && t.status !== value;
+    const moved = (field === "status" && t.status !== value) || field === "assignee";
     t[field] = value;
     if (position != null) t.position = position;
-    statusChanged ? render() : renderCard(id);
-    if (openId === id && document.activeElement !== fields[field]) fields[field].value = value ?? "";
-    if (field === "title" || field === "notes") showTyping(id, field, user);
+    moved ? render() : renderCard(id);
+    if (openId === id) {
+      if (field === "checklist") renderChecklist(t);
+      else if (document.activeElement !== fields[field]) fields[field].value = value ?? "";
+    }
+    if (["title", "notes", "checklist"].includes(field)) showTyping(id, field, user);
   });
 
   store.onTask(({ type, task }) => {
@@ -266,16 +417,14 @@
       return render();
     }
     if (timers.has(task.id)) return; // abbiamo modifiche locali non ancora salvate
-    tasks.set(task.id, { ...tasks.get(task.id), ...task });
+    tasks.set(task.id, normalize({ ...tasks.get(task.id), ...task }));
     render();
     if (openId === task.id) fillPanel(tasks.get(task.id));
   });
 
   store.onPeople((list) => {
     people = list.filter(Boolean);
-    $("#people").innerHTML = people
-      .map((p) => `<span class="avatar" style="background:${esc(p.color)}" title="${esc(p.name)}${p.id === me.id ? " (tu)" : ""}">${esc(initials(p.name))}</span>`)
-      .join("");
+    $("#people").innerHTML = people.filter((p) => p.id !== me.id).map((p) => avatar(p.name)).join("");
     renderNames();
   });
 
@@ -288,12 +437,10 @@
   dialog.addEventListener("close", () => {
     const name = $("#name-input").value.trim();
     if (!name || name === storedName) return;
-    me.name = name;
-    me.color = colorFor(name);
     try { localStorage.setItem("planner.name", name); } catch {}
     location.reload(); // riannuncia la presenza con il nuovo nome
   });
-  $("#me").textContent = me.name;
+  $("#me").innerHTML = `${avatar(me.name)}<span class="me-name">${esc(me.name)}</span>`;
   $("#me").addEventListener("click", askName);
 
   // ---------- Avvio ----------
@@ -307,8 +454,9 @@
     modeEl.title = "Dati solo su questo computer. Configura Supabase in config.js per lavorare in team.";
   }
 
+  setFilter(filter);
   store.list()
-    .then((list) => { list.forEach((t) => tasks.set(t.id, t)); render(); })
+    .then((list) => { list.forEach((t) => tasks.set(t.id, normalize(t))); render(); })
     .catch(() => { modeEl.textContent = "Errore di connessione"; });
 
   if (!storedName) askName();

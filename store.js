@@ -117,7 +117,9 @@
   }
 
   window.createStore = function (me) {
-    const live = cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase;
+    // Aggiungi ?local all'indirizzo per provare l'app senza toccare i dati del team.
+    const forceLocal = new URLSearchParams(location.search).has("local");
+    const live = !forceLocal && cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase;
     return live ? createSupabaseStore(me) : createLocalStore(me);
   };
 })();

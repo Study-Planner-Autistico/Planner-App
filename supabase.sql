@@ -1,4 +1,5 @@
 -- Esegui questo script nel SQL Editor del tuo progetto Supabase.
+-- Si può rieseguire senza problemi: aggiunge solo ciò che manca.
 
 create table if not exists public.tasks (
   id          uuid primary key,
@@ -13,13 +14,20 @@ create table if not exists public.tasks (
   updated_at  timestamptz not null default now()
 );
 
+-- Etichetta e checklist (aggiunte nella versione 2).
+alter table public.tasks add column if not exists tag       text  not null default '';
+alter table public.tasks add column if not exists checklist jsonb not null default '[]'::jsonb;
+
 -- Invia le modifiche complete (anche i DELETE) ai client in ascolto.
 alter table public.tasks replica identity full;
 
--- Abilita il tempo reale sulla tabella.
-alter publication supabase_realtime add table public.tasks;
+-- Abilita il tempo reale sulla tabella (ignora l'errore se è già abilitato).
+do $$ begin
+  alter publication supabase_realtime add table public.tasks;
+exception when duplicate_object then null;
+end $$;
 
--- Accesso: chiunque abbia l'URL dell'app e la chiave anon può leggere e scrivere.
+-- Accesso: chiunque abbia l'URL dell'app e la chiave pubblica può leggere e scrivere.
 -- Va bene per un team piccolo; per limitare l'accesso aggiungi Supabase Auth.
 alter table public.tasks enable row level security;
 
